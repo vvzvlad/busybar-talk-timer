@@ -1,0 +1,17 @@
+{
+  "format_version": 1,
+  "version": 1,
+  "fields": {
+    "length_min": {
+      "type": "integer",
+      "label": "Talk length, minutes",
+      "description": "The wheel changes it before the start.",
+      "default": 10,
+      "min": 1,
+      "max": 99
+    },
+    "yellow_min": { "type": "integer", "label": "Yellow at, minutes left", "default": 2, "min": 1, "max": 99 },
+    "red_min": { "type": "integer", "label": "Red at, minutes left", "default": 1, "min": 1, "max": 99 },
+    "sound": { "type": "boolean", "label": "Sound", "description": "At yellow, at red and at zero.", "default": true }
+  }
+}

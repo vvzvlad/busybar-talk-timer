@@ -14,8 +14,10 @@ export function createScreen(app: string, report: (err: unknown) => void) {
   let forgotten = false;
   let busy = false;
   let next: Element[] | null = null;
+  /** The colour the waiting frame blinks the status LED with; a newer frame that replaces it keeps the blink. */
+  let nextLed: string | undefined;
 
-  async function send(elements: Element[]): Promise<void> {
+  async function send(elements: Element[], led: string | undefined): Promise<void> {
     const before = shown;
     // Until the request is answered the screen is unknown: a failed one leaves it so, and the next frame starts over.
     shown = null;
@@ -26,25 +28,32 @@ export function createScreen(app: string, report: (err: unknown) => void) {
       const changed = elements.filter((e) => before.get(e.id) !== JSON.stringify(e));
       if (gone.length > 0) await device.DisplayClear({ application_name: app, element_ids: gone });
       // busy-lib's element types are stricter than the firmware about optional fields; these follow the firmware.
-      if (changed.length > 0) await device.DisplayDraw({ application_name: app, priority: 50, elements: changed } as never);
+      // The blink rides on a draw request, so a frame that blinks with nothing changed is sent whole.
+      if (changed.length > 0 || led) {
+        const sent = changed.length > 0 ? changed : elements;
+        await device.DisplayDraw({ application_name: app, priority: 50, led_notification_color: led, elements: sent } as never);
+      }
     } else {
       await device.DisplayClear({ application_name: app });
-      if (elements.length > 0) await device.DisplayDraw({ application_name: app, priority: 50, elements } as never);
+      if (elements.length > 0) await device.DisplayDraw({ application_name: app, priority: 50, led_notification_color: led, elements } as never);
     }
     if (!forgotten) shown = new Map(elements.map((e): [string, string] => [e.id, JSON.stringify(e)]));
   }
 
   return {
-    /** Shows exactly these elements. Errors are reported, not thrown. */
-    draw(elements: Element[]): void {
+    /** Shows exactly these elements; with `led` ("#RRGGBBAA") the status LED blinks that colour. Errors are reported, not thrown. */
+    draw(elements: Element[], led?: string): void {
       next = elements;
+      if (led) nextLed = led;
       if (busy) return;
       busy = true;
       void (async () => {
         while (next) {
           const frame = next;
+          const blink = nextLed;
           next = null;
-          await send(frame).catch(report);
+          nextLed = undefined;
+          await send(frame, blink).catch(report);
         }
         busy = false;
       })();
